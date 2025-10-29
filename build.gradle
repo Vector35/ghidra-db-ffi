@@ -1,0 +1,40 @@
+plugins {
+  id 'java-library'
+  id 'org.graalvm.buildtools.native' version '0.11.0'
+}
+
+repositories {
+  mavenCentral()
+}
+
+def osName = System.getProperty("os.name").toLowerCase()
+def osArch = System.getProperty("os.arch").toLowerCase().replace("amd64", "x64").replace("amd64", "x64").replace("x86_64", "x64")
+
+graalvmNative {
+  binaries.main {
+    imageName =  'libghidra'
+    debug = project.hasProperty('buildDebug') ? project.property('buildDebug').toBoolean() : true
+    fallback = false
+    sharedLibrary = true
+    quickBuild = true
+    useArgFile = false
+    buildDir = "build/" + osArch
+
+    if (osName.contains("windows")) {
+      // Checking toolchain is super fragile on windows
+      buildArgs.add('-H:+UnlockExperimentalVMOptions')
+      buildArgs.add('-H:-CheckToolchain')
+    } else if (osName.contains("mac")) {
+      // Checking toolchain fails when running under rosetta
+      buildArgs.add('-H:+UnlockExperimentalVMOptions')
+      buildArgs.add('-H:-CheckToolchain')
+    } else if (osName.contains("linux")) {
+    }
+
+    buildArgs.add('-Ob')
+    //buildArgs.add("--emit build-report")
+  }
+}
+
+dependencies {
+}

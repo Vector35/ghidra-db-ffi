@@ -1,0 +1,13 @@
+# Third Party Licenses
+
+## Ghidra
+This project includes modified source code from Ghidra.
+Copyright: National Security Agency
+License: Apache License 2.0
+Source: https://github.com/NationalSecurityAgency/ghidra
+
+## GraalVM Community Edition
+This project uses GraalVM CE for native compilation.
+Copyright: Oracle Corporation and/or its affiliates
+License: GNU General Public License v2 with Classpath Exception
+Source: https://github.com/oracle/graal

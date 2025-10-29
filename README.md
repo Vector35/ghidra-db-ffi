@@ -1,0 +1,1 @@
+The greater majority of code in `src/main/java/db` and `src/main/java/ghidra` comes from Ghidra and has been reorganized and modified to work as a more-or-less standalone interface for interacting with Ghidra's `.gbf` format.
