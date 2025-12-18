@@ -228,7 +228,7 @@ public class Schema {
 	 * The first field name corresponds to the key name.
 	 * @throws UnsupportedFieldException if unsupported fieldType specified
 	 */
-	Schema(int version, byte encodedKeyFieldType, byte[] encodedFieldTypes, String packedFieldNames)
+	public Schema(int version, byte encodedKeyFieldType, byte[] encodedFieldTypes, String packedFieldNames)
 			throws UnsupportedFieldException {
 		this.version = version;
 		this.keyType = Field.getField(encodedKeyFieldType);
