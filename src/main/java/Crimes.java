@@ -797,10 +797,10 @@ public class Crimes {
     @CEntryPoint(name = "FFI_write_record_to_table")
     public static boolean writeRecordToTable(@CEntryPoint.IsolateThreadContext long isolateId, int dbId,
             @CConst CCharPointer cTableName, @CConst CGhidraRecordPointer cRecord) {
+        String tableName = CTypeConversion.toJavaString(cTableName);
         try {
 
             int fieldCount = cRecord.fieldCount();
-            String tableName = CTypeConversion.toJavaString(cTableName);
 
             DBHandle handle = getDbHandleFromId(dbId);
             Table table = handle.getTable(tableName);
@@ -825,6 +825,7 @@ public class Crimes {
             return true;
         } catch (Exception e) {
             // TODO: need to end transaction in case of error
+            System.err.println("Failed writing record to " + tableName);
             e.printStackTrace();
             return false;
         }
