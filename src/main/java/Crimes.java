@@ -703,7 +703,8 @@ public class Crimes {
             final String outputFilePath = CTypeConversion.toJavaString(cOutputFilePath);
             File outputFile = new File(outputFilePath);
             if (outputFile.exists()) {
-                throw new DuplicateFileException(outputFile + " already exists");
+                if (!outputFile.delete())
+                    throw new DuplicateFileException(outputFile + " already exists");
             }
             boolean success = false;
             File tmpFile = null;
