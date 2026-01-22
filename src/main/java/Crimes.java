@@ -779,10 +779,14 @@ public class Crimes {
             case GhidraFieldType.LONG_TYPE:
                 return new LongField(cField.longValue());
             case GhidraFieldType.STRING_TYPE: {
+                if (cField.stringValue().isNull())
+                    return null;
                 String stringVal = CTypeConversion.toJavaString(cField.stringValue());
                 return new StringField(stringVal);
             }
             case GhidraFieldType.BINARY_OBJ_TYPE: {
+                if (cField.binaryValue().isNull())
+                    return null;
                 ByteBuffer dataBuf = CTypeConversion.asByteBuffer(cField.binaryValue(), (int) cField.valueLength());
                 byte[] data = new byte[(int) cField.valueLength()];
                 dataBuf.get(data);
@@ -817,7 +821,12 @@ public class Crimes {
             for (int i = 1; i < fieldCount; i++) {
                 CGhidraFieldPointer cField = cFields.addressOf(i);
                 Field field = cFieldToField(cField);
-                record.setField(i - 1, field);
+                if (field != null) {
+                    record.setField(i - 1, field);
+                }
+                else {
+                    record.setNull(i - 1);
+                }
             }
 
             long txId = handle.startTransaction();
