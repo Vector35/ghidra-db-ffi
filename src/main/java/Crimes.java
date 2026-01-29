@@ -1,7 +1,11 @@
 import java.io.BufferedInputStream;
+import java.io.BufferedOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -42,6 +46,7 @@ import db.StringField;
 import db.Table;
 import db.Field.UnsupportedFieldException;
 import db.buffers.LocalBufferFile;
+import ghidra.framework.store.local.ItemDeserializer;
 import ghidra.framework.store.local.ItemSerializer;
 import ghidra.util.exception.DuplicateFileException;
 
@@ -286,9 +291,51 @@ public class Crimes {
         try {
             LocalBufferFile bf = new LocalBufferFile(selectedFile, true);
             handle = new DBHandle(bf);
+        } catch (IOException e) {
+            // This might be a packed database
+            // unpack to a temporary location, load dbhandle, delete tempfile
+            ItemDeserializer itemDeserializer = null;
+
+            File tempUnpackFile = null;
+            OutputStream out = null;
+            try {
+                // Set up a tempfile to unpack to
+                tempUnpackFile = File.createTempFile("bn-ghidra-", ".gbf");
+                tempUnpackFile.deleteOnExit();
+                out = new BufferedOutputStream(new FileOutputStream(tempUnpackFile));
+
+                // Unpack the (possibly) packed database to the tempfile
+                itemDeserializer = new ItemDeserializer(selectedFile);
+                itemDeserializer.saveItem(out);
+                out.flush();
+
+                // Load a DBHandle for the unpacked contents
+                LocalBufferFile bf = new LocalBufferFile(tempUnpackFile, true);
+                handle = new DBHandle(bf);
+            } catch (IOException deserExc) {
+                deserExc.printStackTrace();
+                return false;
+            } finally {
+                // Close the deserializer if it exists
+                if (itemDeserializer != null) {
+                    itemDeserializer.dispose();
+                }
+
+                // Close the output stream to the tempfile if it exists
+                try {
+                    if (out != null) {
+                        out.close();
+                    }
+                } catch (IOException closeExc) {
+                    // ignore (ghidra ignores it too)
+                }
+
+                // Delete the tempfile we set up to unpack to if it exists
+                if (tempUnpackFile != null) {
+                    tempUnpackFile.delete();
+                }
+            }
         } catch (Exception e) {
-            // Trying to open a PackedDatabase throws an IOException but we don't support
-            // those (yet?)
             e.printStackTrace();
             return false;
         }
@@ -823,8 +870,7 @@ public class Crimes {
                 Field field = cFieldToField(cField);
                 if (field != null) {
                     record.setField(i - 1, field);
-                }
-                else {
+                } else {
                     record.setNull(i - 1);
                 }
             }
