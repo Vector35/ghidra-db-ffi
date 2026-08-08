@@ -9,6 +9,7 @@ repositories {
 
 def osName = System.getProperty("os.name").toLowerCase()
 def osArch = System.getProperty("os.arch").toLowerCase().replace("amd64", "x64").replace("amd64", "x64").replace("x86_64", "x64")
+def gradleOutputBase = project.findProperty('gradleOutputBase') ?: 'build'
 
 graalvmNative {
   binaries.main {
@@ -18,7 +19,7 @@ graalvmNative {
     sharedLibrary = true
     quickBuild = true
     useArgFile = false
-    buildDir = "build/" + osArch
+    buildDir = gradleOutputBase + "/" + osArch
 
     if (osName.contains("windows")) {
       // Checking toolchain is super fragile on windows

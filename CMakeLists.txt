@@ -94,6 +94,15 @@ else()
 endif()
 
 set(GRADLE_ARG_LIST "")
+set(GRADLE_OUTPUT_BASE "${PROJECT_BINARY_DIR}/gradle-build")
+set(GRADLE_PROJECT_CACHE_DIR "${PROJECT_BINARY_DIR}/gradle-project-cache")
+set(GHIDRA_BINDINGS_HEADER "${PROJECT_SOURCE_DIR}/../java-bindings.h")
+set(GRADLE_BINDINGS_HEADER "${PROJECT_BINARY_DIR}/../java-bindings.h")
+list(APPEND GRADLE_ARG_LIST
+    "-PgradleOutputBase=${GRADLE_OUTPUT_BASE}"
+    "--project-cache-dir"
+    "${GRADLE_PROJECT_CACHE_DIR}"
+)
 
 if(NOT GRADLE_DAEMON)
     list(APPEND GRADLE_ARG_LIST "--no-daemon")
@@ -146,17 +155,13 @@ else()
 endif()
 
 if(APPLE AND UNIVERSAL)
-    set(AARCH64_BUILD_OUTPUT_PATH "${PROJECT_SOURCE_DIR}/build/aarch64/native/nativeCompile/")
-    set(X64_BUILD_OUTPUT_PATH "${PROJECT_SOURCE_DIR}/build/x64/native/nativeCompile/")
+    get_filename_component(AARCH64_BUILD_OUTPUT_PATH "${GRADLE_OUTPUT_BASE}/aarch64/native/nativeCompile" ABSOLUTE)
+    get_filename_component(X64_BUILD_OUTPUT_PATH "${GRADLE_OUTPUT_BASE}/x64/native/nativeCompile" ABSOLUTE)
 else()
     if(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|AMD64")
-        set(BUILD_OUTPUT_PATH
-            "${PROJECT_SOURCE_DIR}/build/x64/native/nativeCompile/"
-        )
+        get_filename_component(BUILD_OUTPUT_PATH "${GRADLE_OUTPUT_BASE}/x64/native/nativeCompile" ABSOLUTE)
     elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64")
-        set(BUILD_OUTPUT_PATH
-            "${PROJECT_SOURCE_DIR}/build/aarch64/native/nativeCompile/"
-        )
+        get_filename_component(BUILD_OUTPUT_PATH "${GRADLE_OUTPUT_BASE}/aarch64/native/nativeCompile" ABSOLUTE)
     else()
         message(FATAL_ERROR "Unknown or unsupported architecture: ${CMAKE_SYSTEM_PROCESSOR}")
     endif()
@@ -168,6 +173,12 @@ add_custom_target(
 )
 
 set_property(TARGET ${PROJECT_NAME} PROPERTY OUTPUT_FILE_PATH ${OUTPUT_FILE_PATH})
+if(APPLE AND UNIVERSAL)
+    set_property(TARGET ${PROJECT_NAME} PROPERTY GHIDRA_DB_FFI_NATIVE_DIR_AARCH64 "${AARCH64_BUILD_OUTPUT_PATH}")
+    set_property(TARGET ${PROJECT_NAME} PROPERTY GHIDRA_DB_FFI_NATIVE_DIR_X86_64 "${X64_BUILD_OUTPUT_PATH}")
+else()
+    set_property(TARGET ${PROJECT_NAME} PROPERTY GHIDRA_DB_FFI_NATIVE_DIR "${BUILD_OUTPUT_PATH}")
+endif()
 if(WIN32)
     set_property(TARGET ${PROJECT_NAME} PROPERTY OUTPUT_LIB_PATH ${OUTPUT_LIB_PATH})
 endif()
@@ -177,12 +188,13 @@ if(APPLE)
         add_custom_command(
             OUTPUT ${OUTPUT_FILE_PATH}
             COMMENT "Building x64 and aarch64 native images with GraalVM"
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different "${GHIDRA_BINDINGS_HEADER}" "${GRADLE_BINDINGS_HEADER}"
             COMMAND ${CMAKE_COMMAND} -E env "MACOSX_DEPLOYMENT_TARGET=10.14" "JAVA_HOME=${JAVA_HOME_AARCH64}" "GRAALVM_HOME=${GRAALVM_HOME_AARCH64}" ${GRADLEW_COMMAND} nativeCompile ${GRADLE_ARG_LIST}
             COMMAND ${CMAKE_COMMAND} -E env "MACOSX_DEPLOYMENT_TARGET=10.14" "JAVA_HOME=${JAVA_HOME_X64}" "GRAALVM_HOME=${GRAALVM_HOME_X64}" ${GRADLEW_COMMAND} nativeCompile ${GRADLE_ARG_LIST}
             COMMAND install_name_tool -id "@rpath/${OUTPUT_FILE_NAME}" "${AARCH64_BUILD_OUTPUT_PATH}/${OUTPUT_FILE_NAME}"
             COMMAND install_name_tool -id "@rpath/${OUTPUT_FILE_NAME}" "${X64_BUILD_OUTPUT_PATH}/${OUTPUT_FILE_NAME}"
-            COMMAND lipo -create "${AARCH64_BUILD_OUTPUT_PATH}/${OUTPUT_FILE_NAME}" "${X64_BUILD_OUTPUT_PATH}/${OUTPUT_FILE_NAME}" -output ${OUTPUT_FILE_PATH}
-            WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
+            COMMAND lipo -create "${AARCH64_BUILD_OUTPUT_PATH}/${OUTPUT_FILE_NAME}" "${X64_BUILD_OUTPUT_PATH}/${OUTPUT_FILE_NAME}" -output "${OUTPUT_FILE_PATH}"
+            WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
             DEPENDS ${DEPENDS_ON}
             USES_TERMINAL
         )
@@ -190,10 +202,11 @@ if(APPLE)
         add_custom_command(
             OUTPUT ${OUTPUT_FILE_PATH}
             COMMENT "Building native image with GraalVM"
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different "${GHIDRA_BINDINGS_HEADER}" "${GRADLE_BINDINGS_HEADER}"
             COMMAND ${CMAKE_COMMAND} -E env "MACOSX_DEPLOYMENT_TARGET=10.14" "JAVA_HOME=${JAVA_HOME}" "GRAALVM_HOME=${GRAALVM_HOME}" ${GRADLEW_COMMAND} nativeCompile ${GRADLE_ARG_LIST}
             COMMAND install_name_tool -id "@rpath/${OUTPUT_FILE_NAME}" "${BUILD_OUTPUT_PATH}/${OUTPUT_FILE_NAME}"
-            COMMAND ${CMAKE_COMMAND} -E copy "${BUILD_OUTPUT_PATH}/${OUTPUT_FILE_NAME}" ${OUTPUT_FILE_PATH}
-            WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
+            COMMAND ${CMAKE_COMMAND} -E copy "${BUILD_OUTPUT_PATH}/${OUTPUT_FILE_NAME}" "${OUTPUT_FILE_PATH}"
+            WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
             DEPENDS ${DEPENDS_ON}
             USES_TERMINAL
         )
@@ -202,10 +215,11 @@ elseif(WIN32)
     add_custom_command(
         OUTPUT ${OUTPUT_FILE_PATH} ${OUTPUT_LIB_PATH}
         COMMENT "Building native image with GraalVM"
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different "${GHIDRA_BINDINGS_HEADER}" "${GRADLE_BINDINGS_HEADER}"
         COMMAND ${CMAKE_COMMAND} -E env "MACOSX_DEPLOYMENT_TARGET=10.14" "JAVA_HOME=${JAVA_HOME}" "GRAALVM_HOME=${GRAALVM_HOME}" ${GRADLEW_COMMAND} nativeCompile ${GRADLE_ARG_LIST}
-        COMMAND ${CMAKE_COMMAND} -E copy "${BUILD_OUTPUT_PATH}/${OUTPUT_FILE_NAME}" ${OUTPUT_FILE_PATH}
-        COMMAND ${CMAKE_COMMAND} -E copy "${BUILD_OUTPUT_PATH}/${OUTPUT_LIB_NAME}" ${OUTPUT_LIB_PATH}
-        WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
+        COMMAND ${CMAKE_COMMAND} -E copy "${BUILD_OUTPUT_PATH}/${OUTPUT_FILE_NAME}" "${OUTPUT_FILE_PATH}"
+        COMMAND ${CMAKE_COMMAND} -E copy "${BUILD_OUTPUT_PATH}/${OUTPUT_LIB_NAME}" "${OUTPUT_LIB_PATH}"
+        WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
         DEPENDS ${DEPENDS_ON}
         USES_TERMINAL
     )
@@ -213,9 +227,10 @@ else()
     add_custom_command(
         OUTPUT ${OUTPUT_FILE_PATH}
         COMMENT "Building native image with GraalVM"
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different "${GHIDRA_BINDINGS_HEADER}" "${GRADLE_BINDINGS_HEADER}"
         COMMAND ${CMAKE_COMMAND} -E env "MACOSX_DEPLOYMENT_TARGET=10.14" "JAVA_HOME=${JAVA_HOME}" "GRAALVM_HOME=${GRAALVM_HOME}" ${GRADLEW_COMMAND} nativeCompile ${GRADLE_ARG_LIST}
-        COMMAND ${CMAKE_COMMAND} -E copy "${BUILD_OUTPUT_PATH}/${OUTPUT_FILE_NAME}" ${OUTPUT_FILE_PATH}
-        WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
+        COMMAND ${CMAKE_COMMAND} -E copy "${BUILD_OUTPUT_PATH}/${OUTPUT_FILE_NAME}" "${OUTPUT_FILE_PATH}"
+        WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
         DEPENDS ${DEPENDS_ON}
         USES_TERMINAL
     )
